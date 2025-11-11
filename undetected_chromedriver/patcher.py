@@ -174,7 +174,7 @@ class Patcher(object):
             pass
 
         release = self.fetch_release_number()
-        self.version_main = release.version[0]
+        self.version_main = release.major
         self.version_full = release
         self.unzip_package(self.fetch_package())
         return self.patch()
@@ -261,7 +261,9 @@ class Patcher(object):
             response = conn.read().decode()
 
         major_versions = json.loads(response)
-        return LooseVersion(major_versions["milestones"][str(self.version_main)]["version"])
+        return LooseVersion(
+            major_versions["milestones"][str(self.version_main)]["version"]
+        )
 
     def parse_exe_version(self):
         with io.open(self.executable_path, "rb") as f:
@@ -278,11 +280,17 @@ class Patcher(object):
         """
         zip_name = f"chromedriver_{self.platform_name}.zip"
         if self.is_old_chromedriver:
-            download_url = "%s/%s/%s" % (self.url_repo, self.version_full.vstring, zip_name)
+            download_url = "%s/%s/%s" % (
+                self.url_repo,
+                str(self.version_full),
+                zip_name,
+            )
         else:
             zip_name = zip_name.replace("_", "-", 1)
-            download_url = "https://storage.googleapis.com/chrome-for-testing-public/%s/%s/%s"
-            download_url %= (self.version_full.vstring, self.platform_name, zip_name)
+            download_url = (
+                "https://storage.googleapis.com/chrome-for-testing-public/%s/%s/%s"
+            )
+            download_url %= (str(self.version_full), self.platform_name, zip_name)
 
         logger.debug("downloading from %s" % download_url)
         return urlretrieve(download_url)[0]
@@ -329,21 +337,29 @@ class Patcher(object):
             # Or psutil if adding a dependency is acceptable.
             command = f"pidof {exe_name}"
             try:
-                result = subprocess.run(command, shell=True, capture_output=True, text=True, check=True)
+                result = subprocess.run(
+                    command, shell=True, capture_output=True, text=True, check=True
+                )
                 pids = result.stdout.strip().split()
                 if pids:
-                    subprocess.run(["kill", "-9"] + pids, check=False) # Changed from -f -9 to -9 as -f is not standard for kill
+                    subprocess.run(
+                        ["kill", "-9"] + pids, check=False
+                    )  # Changed from -f -9 to -9 as -f is not standard for kill
                     return True
-                return False # No PIDs found
-            except subprocess.CalledProcessError: # pidof returns 1 if no process found
-                return False # No process found
+                return False  # No PIDs found
+            except subprocess.CalledProcessError:  # pidof returns 1 if no process found
+                return False  # No process found
             except Exception as e:
                 logger.debug(f"Error killing process on POSIX: {e}")
                 return False
         else:
             try:
                 # TASKKILL /F /IM chromedriver.exe
-                result = subprocess.run(["taskkill", "/f", "/im", exe_name], check=False, capture_output=True)
+                result = subprocess.run(
+                    ["taskkill", "/f", "/im", exe_name],
+                    check=False,
+                    capture_output=True,
+                )
                 # taskkill returns 0 if process was killed, 128 if not found.
                 return result.returncode == 0
             except Exception as e:
